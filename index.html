@@ -116,6 +116,19 @@
                 </div>
             </aside>
         </main>
+
+        <!-- GAME OVER OVERLAY (stays on game screen so board is visible) -->
+        <div id="gameover-overlay" class="gameover-overlay" style="display:none;">
+            <div class="gameover-panel">
+                <h2 id="gameover-title" class="gameover-title">MISSION FAILED</h2>
+                <div id="gameover-eulogy" class="gameover-eulogy"></div>
+                <div id="gameover-stats" class="gameover-stats"></div>
+                <div class="gameover-buttons">
+                    <button id="btn-overlay-retry" class="btn-military">↻ TRY AGAIN</button>
+                    <button id="btn-overlay-base" class="btn-military btn-secondary">◄ RETURN TO BASE</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- ═══════════════ EXPLOSION SCREEN ═══════════════ -->

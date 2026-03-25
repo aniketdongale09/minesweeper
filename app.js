@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 // ─── CONFIGURATION ─────────────────────────────────────────
-const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 // API key stored securely in localStorage
 function getApiKey() {
@@ -101,6 +101,12 @@ const dom = {
   btnVoice: $('#btn-voice'),
   btnAutoSolve: $('#btn-auto-solve'),
   btnSurrender: $('#btn-surrender'),
+  gameoverOverlay: $('#gameover-overlay'),
+  gameoverTitle: $('#gameover-title'),
+  gameoverEulogy: $('#gameover-eulogy'),
+  gameoverStats: $('#gameover-stats'),
+  btnOverlayRetry: $('#btn-overlay-retry'),
+  btnOverlayBase: $('#btn-overlay-base'),
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -751,15 +757,10 @@ async function handleExplosion(r, c, isSurrender = false) {
 
   playSound('explosion');
 
-  // Reveal tiles (mines only for normal explosion, all tiles for surrender)
-  if (r >= 0 && r < state.rows && c >= 0 && c < state.cols) {
-    state.board[r][c].revealed = true;
-  }
+  // Reveal ALL tiles so the player can see the full board
   for (let rr = 0; rr < state.rows; rr++) {
     for (let cc = 0; cc < state.cols; cc++) {
-      if (isSurrender || state.board[rr][cc].mine) {
-        state.board[rr][cc].revealed = true;
-      }
+      state.board[rr][cc].revealed = true;
     }
   }
   renderGrid();
@@ -770,50 +771,37 @@ async function handleExplosion(r, c, isSurrender = false) {
 
   // Get Rex's eulogy
   const tileLabel = tileCoordToLabel(r, c);
-  const prompt = JSON.stringify({
-    action: 'explosion',
-    tile: tileLabel,
-    minesRemaining: state.minesRemaining,
-    tilesLeft: state.totalSafeTiles - state.tilesRevealed,
-    timeElapsed: state.timer,
-  });
-
   showRexLoading(true);
   const moveLog = state.moveHistory.join(" -> ");
-  const gameOverPrompt = `The rookie just triggered a mine and died. The mission failed.
+  const gameOverPrompt = isSurrender
+    ? `The rookie surrendered and gave up. Give a ${state.personality === 'comedian' ? 'sarcastically funny' : state.personality === 'mentor' ? 'understanding but disappointed' : 'harsh and disgusted'} 2-sentence tactical commentary. End with "MISSION ABORTED".`
+    : `The rookie just triggered a mine and died. The mission failed.
 Here are their last few moves: ${moveLog}.
 Based on Minesweeper logic, brutally point out their fatal mistake or logical error (e.g. "You should have known X was a mine because...").
 Give a dramatic, ${state.personality === 'comedian' ? 'sarcastically funny' : 'harsh'} tactical analysis.
 End with "MISSION FAILED". Max 4 sentences.`;
 
-  const eulogyPromise = queueGeminiCall(gameOverPrompt, null, "Explosion Detected");
+  const eulogyPromise = queueGeminiCall(gameOverPrompt, null, isSurrender ? "Mission Aborted" : "Explosion Detected");
 
-  // Pause then show explosion screen
-  await delay(1500);
+  // Show inline game-over overlay on the game screen (board stays visible)
+  await delay(800);
 
-  if (isSurrender) {
-    // Keep game screen visible underneath the overlay
-    dom.screens.explosion.classList.add('active', 'surrender-overlay');
-  } else {
-    showScreen('explosion');
-  }
-
-  // Flash effect
-  dom.explosionFlash.classList.add('active');
-  setTimeout(() => dom.explosionFlash.classList.remove('active'), 800);
-
-  // Stats
-  dom.explosionStats.innerHTML = `
+  dom.gameoverTitle.textContent = isSurrender ? 'MISSION ABORTED' : 'MISSION FAILED';
+  dom.gameoverStats.innerHTML = `
     TIME SURVIVED: ${formatTime(state.timer)}<br>
     TILES CLEARED: ${state.tilesRevealed}<br>
     MINES REMAINING: ${state.minesRemaining}
   `;
+  dom.gameoverEulogy.textContent = '';
+  dom.gameoverOverlay.style.display = 'flex';
 
   // Eulogy
   const eulogy = await eulogyPromise;
   showRexLoading(false);
-  const eulogyText = eulogy || "That rookie had guts. More guts than brains, but guts nonetheless. The field claims another. Remember their name. We move on, because that's what soldiers do.";
-  await typewriter(dom.explosionEulogy, eulogyText, 35);
+  const eulogyText = eulogy || (isSurrender
+    ? "Retreating from the field. Some battles aren't meant to be won today."
+    : "That rookie had guts. More guts than brains, but guts nonetheless. The field claims another.");
+  await typewriter(dom.gameoverEulogy, eulogyText, 30);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1051,6 +1039,9 @@ function resetGame() {
 
   dom.grid.innerHTML = '';
   renderGrid();
+
+  // Hide game-over overlay if visible
+  dom.gameoverOverlay.style.display = 'none';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1103,6 +1094,20 @@ function setupEvents() {
 
   // Return to base
   dom.btnReturnBase.addEventListener('click', () => {
+    state.rexHistory = [];
+    showMissionBriefing();
+  });
+
+  // Overlay retry button (same as Try Again)
+  dom.btnOverlayRetry.addEventListener('click', () => {
+    showScreen('game');
+    state.rexHistory = [];
+    resetGame();
+    addRexMessage("Back on your feet, soldier. This minefield won't clear itself.", "Retry");
+  });
+
+  // Overlay return to base
+  dom.btnOverlayBase.addEventListener('click', () => {
     state.rexHistory = [];
     showMissionBriefing();
   });
