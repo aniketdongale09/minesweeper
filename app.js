@@ -415,8 +415,13 @@ function forEachNeighbor(r, c, callback) {
   }
 }
 
+function colToLetter(c) {
+  if (c < 26) return String.fromCharCode(65 + c);
+  return String.fromCharCode(65 + Math.floor(c / 26) - 1) + String.fromCharCode(65 + (c % 26));
+}
+
 function tileCoordToLabel(r, c) {
-  return String.fromCharCode(65 + c) + (r + 1);
+  return colToLetter(c) + (r + 1);
 }
 
 function labelToCoord(label) {
@@ -591,7 +596,7 @@ function renderGrid() {
     for (let c = 0; c < cols; c++) {
       const colLabel = document.createElement('div');
       colLabel.className = 'grid-label grid-col-label';
-      colLabel.textContent = String.fromCharCode(65 + c);
+      colLabel.textContent = colToLetter(c);
       dom.grid.appendChild(colLabel);
     }
 
