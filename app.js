@@ -90,6 +90,9 @@ const dom = {
   apiKeyInput: $('#api-key-input'),
   btnSaveKey: $('#btn-save-key'),
   btnSettingsKey: $('#btn-settings-key'),
+  btnManual: $('#btn-manual'),
+  manualModal: $('#manual-modal'),
+  btnCloseManual: $('#btn-close-manual'),
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -1045,8 +1048,29 @@ function setupEvents() {
   // API Key modal
   setupApiKeyModal();
 
+  // Field Manual modal
+  setupManualModal();
+
   // Prevent context menu on grid
   dom.grid.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
+// ═══════════════════════════════════════════════════════════
+// FIELD MANUAL MODAL
+// ═══════════════════════════════════════════════════════════
+
+function setupManualModal() {
+  dom.btnManual.addEventListener('click', () => {
+    dom.manualModal.classList.add('active');
+  });
+
+  dom.btnCloseManual.addEventListener('click', () => {
+    dom.manualModal.classList.remove('active');
+  });
+
+  dom.manualModal.addEventListener('click', (e) => {
+    if (e.target === dom.manualModal) dom.manualModal.classList.remove('active');
+  });
 }
 
 // ═══════════════════════════════════════════════════════════

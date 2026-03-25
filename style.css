@@ -1050,6 +1050,97 @@ body {
     border-color: var(--green);
 }
 
+/* ─── FIELD MANUAL MODAL ────────────────────────── */
+.manual-box {
+    max-width: 600px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.btn-close-modal {
+    background: transparent;
+    color: var(--red);
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    margin-left: auto;
+    line-height: 1;
+}
+
+.btn-close-modal:hover {
+    color: var(--red-glow);
+    text-shadow: 0 0 10px var(--red);
+}
+
+.manual-content {
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.manual-content h3 {
+    font-family: var(--font-heading);
+    color: var(--gold);
+    letter-spacing: 0.1em;
+    font-size: 1rem;
+    margin: 1.5rem 0 0.8rem;
+    border-bottom: 1px dashed rgba(255, 215, 0, 0.3);
+    padding-bottom: 0.3rem;
+}
+
+.manual-content h3:first-child {
+    margin-top: 0;
+}
+
+.manual-content ul {
+    list-style-type: square;
+    padding-left: 1.2rem;
+    color: var(--text);
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+
+.manual-content li {
+    margin-bottom: 0.5rem;
+}
+
+.manual-content p {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.pattern-item {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(0, 255, 65, 0.1);
+    border-left: 3px solid var(--green);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.pattern-item h4 {
+    color: var(--green);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    font-family: var(--font-heading);
+}
+
+.pattern-item p {
+    margin-bottom: 0.8rem;
+}
+
+.pattern-diagram {
+    background: rgba(0, 255, 65, 0.05);
+    padding: 0.8rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    white-space: pre;
+    color: var(--text);
+    border: 1px solid rgba(0, 255, 65, 0.1);
+}
+
 /* ═══════════════════════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════════════════════ */
