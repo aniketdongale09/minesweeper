@@ -369,6 +369,7 @@ function initStaticAnimation() {
 
 function showScreen(screenName) {
   Object.values(dom.screens).forEach(s => s.classList.remove('active'));
+  dom.screens.explosion.classList.remove('surrender-overlay');
   dom.screens[screenName].classList.add('active');
 }
 
@@ -789,7 +790,13 @@ End with "MISSION FAILED". Max 4 sentences.`;
 
   // Pause then show explosion screen
   await delay(1500);
-  showScreen('explosion');
+
+  if (isSurrender) {
+    // Keep game screen visible underneath the overlay
+    dom.screens.explosion.classList.add('active', 'surrender-overlay');
+  } else {
+    showScreen('explosion');
+  }
 
   // Flash effect
   dom.explosionFlash.classList.add('active');

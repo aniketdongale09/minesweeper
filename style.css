@@ -754,6 +754,11 @@ body {
     background: var(--bg);
 }
 
+#explosion-screen.surrender-overlay {
+    background: rgba(5, 5, 5, 0.85);
+    z-index: 90;
+}
+
 .explosion-flash {
     position: fixed;
     inset: 0;
