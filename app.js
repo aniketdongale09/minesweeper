@@ -744,17 +744,21 @@ function renderGrid() {
 // EXPLOSION HANDLING
 // ═══════════════════════════════════════════════════════════
 
-async function handleExplosion(r, c) {
+async function handleExplosion(r, c, isSurrender = false) {
   state.gameOver = true;
   stopTimer();
 
   playSound('explosion');
 
-  // Reveal all mines
-  state.board[r][c].revealed = true;
+  // Reveal tiles (mines only for normal explosion, all tiles for surrender)
+  if (r >= 0 && r < state.rows && c >= 0 && c < state.cols) {
+    state.board[r][c].revealed = true;
+  }
   for (let rr = 0; rr < state.rows; rr++) {
     for (let cc = 0; cc < state.cols; cc++) {
-      if (state.board[rr][cc].mine) state.board[rr][cc].revealed = true;
+      if (isSurrender || state.board[rr][cc].mine) {
+        state.board[rr][cc].revealed = true;
+      }
     }
   }
   renderGrid();
@@ -1135,8 +1139,8 @@ function setupEvents() {
       (state.personality === 'mentor') ? "Tactical retreat is sometimes necessary. Standing down." :
         "Finally gave up, huh? Good idea, let's go get coffee.", "Mission Aborted");
 
-    // Trigger game loss (using 0,0 as coordinates since it's a manual surrender)
-    handleExplosion(0, 0);
+    // Trigger game loss (using 0,0 with isSurrender flag set to true)
+    handleExplosion(0, 0, true);
   });
 
   dom.rexPersonality.addEventListener('change', (e) => {
