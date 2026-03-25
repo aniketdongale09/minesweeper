@@ -964,6 +964,58 @@ body {
     font-weight: bold;
 }
 
+/* ─── AI CONTROLS ───────────────────────────────── */
+.ai-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-right: 0.5rem;
+    padding-right: 0.5rem;
+    border-right: 1px solid rgba(0, 255, 65, 0.2);
+}
+
+.rex-select {
+    font-family: var(--font-heading);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--green);
+    border: 1px solid var(--green);
+    padding: 0.35rem;
+    outline: none;
+    cursor: pointer;
+}
+
+.rex-select option {
+    background: var(--bg);
+    color: var(--green);
+}
+
+.btn-solve {
+    color: var(--yellow);
+    border-color: var(--yellow);
+    font-family: var(--font-heading);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    padding: 0 0.5rem;
+    width: auto;
+}
+
+.btn-solve:hover {
+    color: var(--bg);
+    background: var(--yellow);
+}
+
+.btn-solve:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background: transparent;
+    color: var(--yellow);
+}
+
 /* ─── SETTINGS BUTTON ───────────────────────────── */
 .btn-settings {
     font-size: 1.2rem;

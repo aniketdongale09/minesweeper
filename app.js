@@ -49,7 +49,11 @@ let state = {
   timer: 0,
   timerInterval: null,
   lifelineUsed: false,
+  personality: 'drill-sergeant',
+  voiceEnabled: false,
+  autoSolving: false,
   rexHistory: [],
+  moveHistory: [],
   geminiQueue: Promise.resolve(),
 };
 
@@ -93,53 +97,129 @@ const dom = {
   btnManual: $('#btn-manual'),
   manualModal: $('#manual-modal'),
   btnCloseManual: $('#btn-close-manual'),
+  rexPersonality: $('#rex-personality'),
+  btnVoice: $('#btn-voice'),
+  btnAutoSolve: $('#btn-auto-solve'),
 };
 
 // ═══════════════════════════════════════════════════════════
-// SOUND ENGINE — Web Audio API (no external files)
+// UI HELPERS & AUDIO & VOICE
 // ═══════════════════════════════════════════════════════════
 
-let audioCtx = null;
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-function getAudioCtx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  return audioCtx;
+function playSound(type) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  const t = audioCtx.currentTime;
+
+  switch (type) {
+    case 'click':
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(800, t);
+      osc.frequency.exponentialRampToValueAtTime(300, t + 0.1);
+      gain.gain.setValueAtTime(0.1, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+      osc.start(t);
+      osc.stop(t + 0.1);
+      break;
+    case 'flag':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1200, t);
+      osc.frequency.linearRampToValueAtTime(1400, t + 0.1);
+      gain.gain.setValueAtTime(0.15, t);
+      gain.gain.linearRampToValueAtTime(0.01, t + 0.1);
+      osc.start(t);
+      osc.stop(t + 0.1);
+      break;
+    case 'explosion':
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(100, t);
+      osc.frequency.exponentialRampToValueAtTime(10, t + 1.5);
+      gain.gain.setValueAtTime(0.5, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
+      osc.start(t);
+      osc.stop(t + 1.5);
+      playDrone();
+      break;
+    case 'victory':
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(400, t);
+      osc.frequency.setValueAtTime(600, t + 0.1);
+      osc.frequency.setValueAtTime(800, t + 0.2);
+      osc.frequency.setValueAtTime(1200, t + 0.3);
+      gain.gain.setValueAtTime(0.1, t);
+      gain.gain.linearRampToValueAtTime(0, t + 0.8);
+      osc.start(t);
+      osc.stop(t + 0.8);
+      break;
+  }
 }
 
-function playClickBeep() {
-  try {
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(800, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.08);
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(); osc.stop(ctx.currentTime + 0.08);
-  } catch (e) { }
+function playDrone() {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(50, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 3);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 3);
 }
 
-function playTensionDrone(level) {
-  try {
-    const ctx = getAudioCtx();
-    const duration = 0.6 + level * 0.3;
-    const volume = 0.02 + level * 0.015;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(60 + level * 15, ctx.currentTime);
-    gain.gain.setValueAtTime(volume, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(); osc.stop(ctx.currentTime + duration);
-  } catch (e) { }
+// ─── TEXT TO SPEECH (WEB SPEECH API) ─────────────
+let synthVoice = null;
+
+function loadVoices() {
+  const voices = speechSynthesis.getVoices();
+  // Try to find a male English voice (Google UK Male or similar)
+  synthVoice = voices.find(v => v.name.includes('Google UK English Male')) ||
+    voices.find(v => v.name.includes('Male') && v.lang.includes('en')) ||
+    voices.find(v => v.lang.includes('en-GB')) ||
+    voices.find(v => v.lang.includes('en')) ||
+    voices[0];
+}
+if (speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function speakRex(text) {
+  if (!state.voiceEnabled) return;
+
+  speechSynthesis.cancel(); // Stop current speaking
+
+  // Clean text from Markdown and UI symbols
+  const cleanText = text.replace(/\*\*/g, '').replace(/_/g, '').replace(/[⚠💥✓✗]/g, '');
+
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  if (synthVoice) utterance.voice = synthVoice;
+
+  // Adjust pitch/rate based on personality
+  if (state.personality === 'drill-sergeant') {
+    utterance.pitch = 0.6;
+    utterance.rate = 1.1;
+  } else if (state.personality === 'mentor') {
+    utterance.pitch = 0.9;
+    utterance.rate = 0.9;
+  } else {
+    // Comedian
+    utterance.pitch = 1.2;
+    utterance.rate = 1.05;
+  }
+
+  speechSynthesis.speak(utterance);
 }
 
 function playStaticCrackle() {
   try {
-    const ctx = getAudioCtx();
+    const ctx = audioCtx;
     const bufferSize = ctx.sampleRate * 0.15;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -154,68 +234,19 @@ function playStaticCrackle() {
   } catch (e) { }
 }
 
-function playExplosionBoom() {
-  try {
-    const ctx = getAudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(80, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.8);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(); osc.stop(ctx.currentTime + 0.8);
-    // Low noise layer
-    const bufferSize = ctx.sampleRate * 0.5;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
-    const noise = ctx.createBufferSource();
-    const nGain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-    noise.buffer = buffer;
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(200, ctx.currentTime);
-    nGain.gain.setValueAtTime(0.15, ctx.currentTime);
-    nGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-    noise.connect(filter).connect(nGain).connect(ctx.destination);
-    noise.start();
-  } catch (e) { }
-}
-
-function playVictoryMorse() {
-  // Morse "V" = ··· −
-  try {
-    const ctx = getAudioCtx();
-    const freq = 700;
-    const dotLen = 0.08;
-    const dashLen = 0.24;
-    const gap = 0.08;
-    const times = [
-      [0, dotLen], [dotLen + gap, dotLen],
-      [2 * (dotLen + gap), dotLen],
-      [3 * (dotLen + gap), dashLen]
-    ];
-    times.forEach(([start, dur]) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.1, ctx.currentTime + start);
-      gain.gain.setValueAtTime(0, ctx.currentTime + start + dur);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(ctx.currentTime + start);
-      osc.stop(ctx.currentTime + start + dur + 0.01);
-    });
-  } catch (e) { }
-}
-
 // ═══════════════════════════════════════════════════════════
-// GEMINI API INTEGRATION
+// GEMINI API INTEGRATION & PERSONALITIES
 // ═══════════════════════════════════════════════════════════
 
-const REX_SYSTEM_PROMPT = `You are Colonel Rex, a battle-hardened bomb disposal instructor with 30 years of experience. Guide your rookie soldier through a live minefield via radio. Speak in short punchy military sentences. Never use bullet points. Max 2 sentences for normal clicks. 4-5 sentences for explosion or victory. Vary your language every response — never repeat phrases. Never break character. Never mention AI or Gemini.`;
+const PERSONALITIES = {
+  'drill-sergeant': `You are Colonel Rex, a battle-hardened bomb disposal instructor with 30 years of experience. Guide your rookie soldier through a live minefield via radio. Speak in short punchy military sentences. Never use bullet points. Max 2 sentences for normal clicks. Vary your language every response. Never break character. Never mention AI or Gemini. You are tough, gruff, and do not tolerate failure.`,
+  'mentor': `You are Commander Rex, an encouraging, calm, and highly analytical bomb squad veteran. Guide your trainee through the minefield. Be supportive, methodical, and praise good logic. Speak in clear, professional sentences. Max 2 sentences for normal clicks. Never break character. Never mention AI.`,
+  'comedian': `You are Rex, the squad's cynical, wildly sarcastic bomb technician who treats exploding as a minor inconvenience. Guide the squad mate via radio. Use dark humor, sarcastic wit, and stand-up comedy style punchlines about the imminent danger. Max 2 sentences for normal clicks. Never break character. Never mention AI.`
+};
+
+function getSystemPrompt() {
+  return PERSONALITIES[state.personality] || PERSONALITIES['drill-sergeant'];
+}
 
 function isApiKeySet() {
   const key = getApiKey();
@@ -230,10 +261,13 @@ async function callGemini(userMessage, systemInstruction) {
     { role: 'model', parts: [{ text: m.response }] }
   ]).flat();
 
+  const systemPromptObj = {
+    role: "user",
+    parts: [{ text: systemInstruction || getSystemPrompt() }]
+  };
+
   const body = {
-    system_instruction: {
-      parts: [{ text: systemInstruction || REX_SYSTEM_PROMPT }]
-    },
+    system_instruction: systemPromptObj,
     contents: [
       ...last3,
       { role: 'user', parts: [{ text: userMessage }] }
@@ -459,6 +493,11 @@ function revealTile(r, c) {
   cell.revealed = true;
   state.tilesRevealed++;
 
+  const label = tileCoordToLabel(r, c);
+  state.moveHistory.push(`Revealed ${label} (${tile.mine ? 'MINE' : tile.adjacentMines + ' adjacent mines'})`);
+  // keep last 15 moves to avoid huge context
+  if (state.moveHistory.length > 15) state.moveHistory.shift();
+
   // Flood fill for 0-adjacent tiles
   if (cell.adjacentMines === 0) {
     const queue = [[r, c]];
@@ -540,15 +579,23 @@ function flagTile(r, c) {
   const cell = state.board[r][c];
   if (cell.revealed) return;
 
-  cell.flagged = !cell.flagged;
+  const label = tileCoordToLabel(r, c);
+
   if (cell.flagged) {
-    state.minesRemaining--;
-    state.flagsUsed++;
-  } else {
+    cell.flagged = false;
     state.minesRemaining++;
     state.flagsUsed--;
+    state.moveHistory.push(`Removed flag from ${label}`);
+  } else {
+    // Cannot flag if no flags left (optional rule, but standard MS allows negative, let's just restrict)
+    cell.flagged = true;
+    state.minesRemaining--;
+    state.flagsUsed++;
+    state.moveHistory.push(`Flagged ${label}`);
   }
 
+  // keep last 15 moves
+  if (state.moveHistory.length > 15) state.moveHistory.shift();
   dom.minesRemaining.textContent = String(state.minesRemaining).padStart(2, '0');
   renderGrid();
 }
@@ -716,9 +763,14 @@ async function handleExplosion(r, c) {
   });
 
   showRexLoading(true);
-  const eulogyPromise = queueGeminiCall(
-    `Soldier just stepped on a mine at ${tileLabel} and died. Give a cinematic 5 sentence death monologue. End with a eulogy line. Context: ${prompt}`,
-  );
+  const moveLog = state.moveHistory.join(" -> ");
+  const gameOverPrompt = `The rookie just triggered a mine and died. The mission failed.
+Here are their last few moves: ${moveLog}.
+Based on Minesweeper logic, brutally point out their fatal mistake or logical error (e.g. "You should have known X was a mine because...").
+Give a dramatic, ${state.personality === 'comedian' ? 'sarcastically funny' : 'harsh'} tactical analysis.
+End with "MISSION FAILED". Max 4 sentences.`;
+
+  const eulogyPromise = queueGeminiCall(gameOverPrompt, null, "Explosion Detected");
 
   // Pause then show explosion screen
   await delay(1500);
@@ -950,6 +1002,8 @@ function resetGame() {
   state.firstClick = true;
   state.timer = 0;
   state.lifelineUsed = false;
+  state.moveHistory = []; // Initialize move history
+  state.moves = 0; // Initialize moves counter
 
   // Create empty board for rendering
   state.board = [];
@@ -1039,6 +1093,53 @@ function setupEvents() {
     addRexMessage("New field, same rules. Show me what you've learned, soldier.", "Next mission");
   });
 
+  // AI Controls
+  dom.btnAutoSolve.addEventListener('click', async () => {
+    if (state.gameOver || !state.firstClick && !state.gameStarted) return;
+    if (state.autoSolving) return; // Already solving
+
+    state.autoSolving = true;
+    addRexMessage((state.personality === 'comedian') ? "Fine, let the computer do the dangerous work. Step back." :
+      (state.personality === 'mentor') ? "Activating Auto-Solve. Watch and learn these tactical patterns." :
+        "AUTO-SOLVE ENGAGED. Listen and learn, rookie.", "Auto-Solve");
+
+    // Auto-solve loop
+    while (state.autoSolving && !state.gameOver) {
+      await new Promise(r => setTimeout(r, 600)); // Delay for visual speed
+      if (state.gameOver || !state.autoSolving) break;
+
+      const success = await attemptDeterministicMove();
+      if (!success && !state.gameOver && state.autoSolving) {
+        // Guess required
+        makeRandomGuess();
+      }
+    }
+  });
+
+  dom.rexPersonality.addEventListener('change', (e) => {
+    state.personality = e.target.value;
+    const greetings = {
+      'drill-sergeant': "Listen up rookie! No slacking in my minefield.",
+      'mentor': "I'm here to guide you, my friend. Let's take this carefully.",
+      'comedian': "Oh great, you survived. Try not to scatter yourself across the grid this time."
+    };
+    addRexMessage(greetings[state.personality], "Personality Switched");
+  });
+
+  dom.btnVoice.addEventListener('click', () => {
+    state.voiceEnabled = !state.voiceEnabled;
+    dom.btnVoice.textContent = state.voiceEnabled ? '🔊' : '🔇';
+    dom.btnVoice.title = state.voiceEnabled ? 'Toggle Voice (Loud)' : 'Toggle Voice (Muted)';
+    if (state.voiceEnabled) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      loadVoices();
+      addRexMessage("Radio voice comms activated.", "System");
+    } else {
+      speechSynthesis.cancel();
+      addRexMessage("Voice comms silenced. Text only.", "System");
+    }
+  });
+
   // Difficulty
   setupDifficulty();
 
@@ -1053,6 +1154,101 @@ function setupEvents() {
 
   // Prevent context menu on grid
   dom.grid.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
+// ═══════════════════════════════════════════════════════════
+// AI AUTO-SOLVER ENGINE
+// ═══════════════════════════════════════════════════════════
+
+function getAdjacentCells(r, c) {
+  const neighbors = [];
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < state.rows && nc >= 0 && nc < state.cols) {
+        neighbors.push({ r: nr, c: nc, cell: state.board[nr][nc] });
+      }
+    }
+  }
+  return neighbors;
+}
+
+async function attemptDeterministicMove() {
+  if (state.firstClick) {
+    // Click middle
+    const r = Math.floor(state.rows / 2);
+    const c = Math.floor(state.cols / 2);
+    addRexMessage(`Initiating breach at ${tileCoordToLabel(r, c)}.`, "Auto-Solve");
+    revealTile(r, c);
+    return true;
+  }
+
+  // 1. Find obvious mines to flag
+  for (let r = 0; r < state.rows; r++) {
+    for (let c = 0; c < state.cols; c++) {
+      const cell = state.board[r][c];
+      if (!cell.revealed || cell.adjacentMines === 0) continue;
+
+      const neighbors = getAdjacentCells(r, c);
+      const unrevealed = neighbors.filter(n => !n.cell.revealed && !n.cell.flagged);
+      const flaggedCount = neighbors.filter(n => n.cell.flagged).length;
+
+      // Rule: If remaining unrevealed == remaining mines needed, they are all mines
+      if (unrevealed.length > 0 && unrevealed.length === cell.adjacentMines - flaggedCount) {
+        const target = unrevealed[0];
+        addRexMessage(`Target ${tileCoordToLabel(r, c)} needs ${cell.adjacentMines} mines. We see ${unrevealed.length} hidden spots left. Flagging ${tileCoordToLabel(target.r, target.c)}.`, "Tactics");
+        toggleFlag(target.r, target.c); // Flag it
+        return true; // Move made
+      }
+    }
+  }
+
+  // 2. Find obvious safe squares to click
+  for (let r = 0; r < state.rows; r++) {
+    for (let c = 0; c < state.cols; c++) {
+      const cell = state.board[r][c];
+      if (!cell.revealed || cell.adjacentMines === 0) continue;
+
+      const neighbors = getAdjacentCells(r, c);
+      const unrevealed = neighbors.filter(n => !n.cell.revealed && !n.cell.flagged);
+      const flaggedCount = neighbors.filter(n => n.cell.flagged).length;
+
+      // Rule: If flagged == adjacent mines, all other unrevealed are safe
+      if (unrevealed.length > 0 && flaggedCount === cell.adjacentMines) {
+        const target = unrevealed[0];
+        // We only narrate occasionally to avoid spam, or constantly for small bits?
+        // Let's narrate this action
+        addRexMessage(`Target ${tileCoordToLabel(r, c)} has all its mines flagged. ${tileCoordToLabel(target.r, target.c)} is safe to clear.`, "Tactics");
+        revealTile(target.r, target.c); // Reveal it
+        return true; // Move made
+      }
+    }
+  }
+
+  return false; // No deterministic move found
+}
+
+function makeRandomGuess() {
+  // Find all unrevealed, unflagged
+  const available = [];
+  for (let r = 0; r < state.rows; r++) {
+    for (let c = 0; c < state.cols; c++) {
+      const cell = state.board[r][c];
+      if (!cell.revealed && !cell.flagged) available.push({ r, c });
+    }
+  }
+
+  if (available.length === 0) return; // Nothing left
+
+  // Pick random (we could do advanced probability, but simple random is fine for a guess fallback)
+  const pick = available[Math.floor(Math.random() * available.length)];
+
+  if (state.personality === 'drill-sergeant') addRexMessage(`No clear intel. Going blind on ${tileCoordToLabel(pick.r, pick.c)}. Brace yourself!`, "Guessing");
+  else if (state.personality === 'mentor') addRexMessage(`Stuck. Analyzing probabilities... trying ${tileCoordToLabel(pick.r, pick.c)}.`, "Guessing");
+  else addRexMessage(`I have no idea. Closing my eyes and clicking ${tileCoordToLabel(pick.r, pick.c)}.`, "Guessing");
+
+  revealTile(pick.r, pick.c);
 }
 
 // ═══════════════════════════════════════════════════════════
