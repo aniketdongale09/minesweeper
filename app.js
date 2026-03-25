@@ -64,9 +64,7 @@ const $$ = (sel) => document.querySelectorAll(sel);
 const dom = {
   screens: {
     briefing: $('#briefing-screen'),
-    game: $('#game-screen'),
-    explosion: $('#explosion-screen'),
-    victory: $('#victory-screen'),
+    game: $('#game-screen')
   },
   briefingText: $('#briefing-text'),
   btnEnterField: $('#btn-enter-field'),
@@ -79,13 +77,11 @@ const dom = {
   lifelineInputArea: $('#lifeline-input-area'),
   lifelineInput: $('#lifeline-input'),
   btnSendLifeline: $('#btn-send-lifeline'),
-  explosionFlash: $('#explosion-flash'),
-  explosionEulogy: $('#explosion-eulogy'),
-  explosionStats: $('#explosion-stats'),
   victoryOverlay: $('#victory-overlay'),
   victorySpeech: $('#victory-speech'),
   victoryTitle: $('#victory-title'),
   victoryStats: $('#victory-stats'),
+  btnVictoryReview: $('#btn-victory-review'),
   btnNextMission: $('#btn-next-mission'),
   confettiCanvas: $('#confetti-canvas'),
   staticCanvas: $('#static-canvas'),
@@ -105,6 +101,7 @@ const dom = {
   gameoverEulogy: $('#gameover-eulogy'),
   gameoverStats: $('#gameover-stats'),
   btnOverlayRetry: $('#btn-overlay-retry'),
+  btnOverlayReview: $('#btn-overlay-review'),
   btnOverlayBase: $('#btn-overlay-base'),
 };
 
@@ -373,9 +370,8 @@ function initStaticAnimation() {
 // ═══════════════════════════════════════════════════════════
 
 function showScreen(screenName) {
-  Object.values(dom.screens).forEach(s => s.classList.remove('active'));
-  dom.screens.explosion.classList.remove('surrender-overlay');
-  dom.screens[screenName].classList.add('active');
+  Object.values(dom.screens).forEach(s => s?.classList.remove('active'));
+  dom.screens[screenName]?.classList.add('active');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -799,6 +795,8 @@ End with "MISSION FAILED". Max 4 sentences.`;
   `;
   dom.gameoverEulogy.textContent = '';
   dom.gameoverOverlay.style.display = 'flex';
+  dom.btnSurrender.innerHTML = '↻ NEW GAME';
+  dom.btnSurrender.classList.add('btn-gold');
 
   // Eulogy
   const eulogy = await eulogyPromise;
@@ -842,6 +840,8 @@ async function handleVictory() {
     TILES CLEARED: ${state.tilesRevealed}<br>
     FLAGS USED: ${state.flagsUsed}
   `;
+  dom.btnSurrender.innerHTML = '↻ NEW GAME';
+  dom.btnSurrender.classList.add('btn-gold');
 
   const speech = await speechPromise;
   showRexLoading(false);
@@ -1033,12 +1033,14 @@ function resetGame() {
   dom.minesRemaining.textContent = String(state.minesRemaining).padStart(2, '0');
   dom.timerDisplay.textContent = '000';
   dom.rexMessages.innerHTML = '';
+  dom.btnSurrender.innerHTML = '☠ SURRENDER';
+  dom.btnSurrender.classList.remove('btn-gold');
   dom.btnLifeline.disabled = false;
   dom.btnLifeline.textContent = '⚠ EMERGENCY RADIO (1x USE)';
   dom.btnLifeline.innerHTML = '<span class="lifeline-icon">⚠</span> EMERGENCY RADIO (1x USE)';
   dom.btnLifeline.style.display = 'flex';
   dom.lifelineInputArea.style.display = 'none';
-  dom.explosionEulogy.textContent = '';
+  dom.gameoverEulogy.textContent = '';
   dom.victorySpeech.textContent = '';
   dom.victoryTitle.textContent = '';
 
@@ -1095,13 +1097,37 @@ function setupEvents() {
     addRexMessage("Channel open. I'm here with you, soldier. Take your first step.", "Game started");
   });
 
-  // Overlay retry button (same as Try Again)
+  // Surrender / New Game
+  dom.btnSurrender.addEventListener('click', () => {
+    if (state.gameOver) {
+      state.rexHistory = [];
+      resetGame();
+      addRexMessage("Back on your feet, soldier. This minefield won't clear itself.", "Retry");
+      return;
+    }
+    // Only allow surrender if a game is in progress (board exists)
+    if (state.firstClick && !state.board?.length) return;
+    handleExplosion(0, 0, true);
+  });
+
+  // Overlay retry button
   dom.btnOverlayRetry.addEventListener('click', () => {
     showScreen('game');
     state.rexHistory = [];
     resetGame();
     addRexMessage("Back on your feet, soldier. This minefield won't clear itself.", "Retry");
   });
+
+  // Overlay review buttons
+  dom.btnOverlayReview.addEventListener('click', () => {
+    dom.gameoverOverlay.style.display = 'none';
+  });
+
+  if (dom.btnVictoryReview) {
+    dom.btnVictoryReview.addEventListener('click', () => {
+      dom.victoryOverlay.style.display = 'none';
+    });
+  }
 
   // Overlay return to base
   dom.btnOverlayBase.addEventListener('click', () => {

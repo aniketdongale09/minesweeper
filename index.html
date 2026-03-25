@@ -115,32 +115,35 @@
                     </div>
                 </div>
             </aside>
-        </main>
-
-        <!-- GAME OVER OVERLAY (stays on game screen so board is visible) -->
-        <div id="gameover-overlay" class="gameover-overlay" style="display:none;">
-            <div class="gameover-panel">
-                <h2 id="gameover-title" class="gameover-title">MISSION FAILED</h2>
-                <div id="gameover-eulogy" class="gameover-eulogy"></div>
-                <div id="gameover-stats" class="gameover-stats"></div>
-                <div class="gameover-buttons">
-                    <button id="btn-overlay-retry" class="btn-military">↻ TRY AGAIN</button>
-                    <button id="btn-overlay-base" class="btn-military btn-secondary">◄ RETURN TO BASE</button>
+            <!-- GAME OVER OVERLAY (stays on game screen so board is visible) -->
+            <div id="gameover-overlay" class="gameover-overlay" style="display:none;">
+                <div class="gameover-panel">
+                    <h2 id="gameover-title" class="gameover-title">MISSION FAILED</h2>
+                    <div id="gameover-eulogy" class="gameover-eulogy"></div>
+                    <div id="gameover-stats" class="gameover-stats"></div>
+                    <div class="gameover-buttons">
+                        <button id="btn-overlay-retry" class="btn-military">↻ TRY AGAIN</button>
+                        <button id="btn-overlay-review" class="btn-military btn-secondary">👁 REVIEW BOARD</button>
+                        <button id="btn-overlay-base" class="btn-military btn-secondary">◄ BASE</button>
+                    </div>
                 </div>
             </div>
-        </div>
-        <!-- VICTORY OVERLAY (stays on game screen so board is visible) -->
-        <div id="victory-overlay" class="victory-overlay" style="display:none;">
-            <div class="victory-pulse" id="victory-pulse"></div>
-            <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
-            <div class="victory-panel">
-                <h1 class="stamp-cleared">FIELD CLEARED</h1>
-                <div id="victory-speech" class="victory-speech"></div>
-                <div id="victory-title" class="legendary-title"></div>
-                <div class="victory-stats" id="victory-stats"></div>
-                <button id="btn-next-mission" class="btn-military btn-gold">▶ NEXT MISSION</button>
+            <!-- VICTORY OVERLAY (stays on game screen so board is visible) -->
+            <div id="victory-overlay" class="victory-overlay" style="display:none;">
+                <div class="victory-pulse" id="victory-pulse"></div>
+                <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+                <div class="victory-panel">
+                    <h1 class="stamp-cleared">FIELD CLEARED</h1>
+                    <div id="victory-speech" class="victory-speech"></div>
+                    <div id="victory-title" class="legendary-title"></div>
+                    <div class="victory-stats" id="victory-stats"></div>
+                    <div class="gameover-buttons">
+                        <button id="btn-next-mission" class="btn-military btn-gold">▶ NEXT MISSION</button>
+                        <button id="btn-victory-review" class="btn-military btn-secondary">👁 REVIEW BOARD</button>
+                    </div>
+                </div>
             </div>
-        </div>
+        </main>
     </div>
 
     <!-- API KEY MODAL -->
