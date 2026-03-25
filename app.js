@@ -7,7 +7,7 @@ const GEMINI_MODEL = 'gemini-2.0-flash';
 
 // API key stored securely in localStorage
 function getApiKey() {
-  return localStorage.getItem('defuse_gemini_key') || '';
+  return "AIzaSyD2Q0jT_N9Y39MxmeY7-e62eVgLSgNMKoM"; // Hardcoded for testing
 }
 function setApiKey(key) {
   localStorage.setItem('defuse_gemini_key', key);
@@ -100,6 +100,7 @@ const dom = {
   rexPersonality: $('#rex-personality'),
   btnVoice: $('#btn-voice'),
   btnAutoSolve: $('#btn-auto-solve'),
+  btnSurrender: $('#btn-surrender'),
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -1114,6 +1115,18 @@ function setupEvents() {
         makeRandomGuess();
       }
     }
+  });
+
+  dom.btnSurrender.addEventListener('click', () => {
+    if (state.gameOver || !state.firstClick && !state.gameStarted) return;
+
+    state.autoSolving = false; // Stop auto-solve if active
+    addRexMessage((state.personality === 'drill-sergeant') ? "Coward. Pathetic display." :
+      (state.personality === 'mentor') ? "Tactical retreat is sometimes necessary. Standing down." :
+        "Finally gave up, huh? Good idea, let's go get coffee.", "Mission Aborted");
+
+    // Trigger game loss (using 0,0 as coordinates since it's a manual surrender)
+    handleExplosion(0, 0);
   });
 
   dom.rexPersonality.addEventListener('change', (e) => {

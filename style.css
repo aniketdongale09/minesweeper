@@ -4,23 +4,24 @@
 
 /* ─── CSS VARIABLES ─────────────────────────────── */
 :root {
-    --bg: #0a0a0a;
-    --bg-panel: #0d0d0d;
+    --bg: #050505;
+    --bg-panel: #0a0a0a;
     --green: #00ff41;
-    --green-dim: #00cc33;
-    --green-dark: #004d14;
-    --red: #ff2020;
-    --red-dim: #cc1a1a;
-    --red-glow: rgba(255, 32, 32, 0.3);
+    --green-dim: #00b32d;
+    --green-dark: #00330d;
+    --green-glow: rgba(0, 255, 65, 0.4);
+    --red: #ff2a2a;
+    --red-dim: #b31d1d;
+    --red-glow: rgba(255, 42, 42, 0.5);
     --orange: #ff8c00;
     --yellow: #ffd700;
     --gold: #ffd700;
-    --olive: #3a3d2e;
-    --olive-light: #4a4d3e;
-    --tile-revealed: #1a1a1a;
-    --tile-border: #555;
-    --text: #c0c0c0;
-    --text-dim: #666;
+    --olive: #2a2d1e;
+    --olive-light: #3a3d2e;
+    --tile-revealed: #111111;
+    --tile-border: #333;
+    --text: #e0e0e0;
+    --text-dim: #888;
     --font-mono: 'Share Tech Mono', monospace;
     --font-heading: 'Oswald', sans-serif;
 }
@@ -1014,6 +1015,35 @@ body {
     cursor: not-allowed;
     background: transparent;
     color: var(--yellow);
+}
+
+.btn-surrender {
+    color: var(--red);
+    border-color: var(--red);
+    font-family: var(--font-heading);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    padding: 0 0.5rem;
+    width: auto;
+}
+
+.btn-surrender:hover {
+    color: var(--bg);
+    background: var(--red);
+    box-shadow: 0 0 10px var(--red);
+}
+
+.btn-surrender:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background: transparent;
+    color: var(--red);
+}
+
+.ai-controls .btn-solve,
+.ai-controls .btn-surrender {
+    width: auto !important;
 }
 
 /* ─── SETTINGS BUTTON ───────────────────────────── */
