@@ -285,7 +285,12 @@ async function callGemini(userMessage, systemInstruction) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`API ${res.status}`);
+    if (!res.ok) {
+      if (res.status === 429) {
+        return "RADIO INTERFERENCE... [429: Too Many Requests]. Standby.";
+      }
+      throw new Error(`API ${res.status}`);
+    }
     const data = await res.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     return text || null;
@@ -516,11 +521,11 @@ function revealTile(r, c) {
   }
 
   renderGrid();
-  playClickBeep();
+  playSound('click');
 
   // Tension drone based on adjacent mine count
   if (cell.adjacentMines >= 1) {
-    playTensionDrone(cell.adjacentMines);
+    if (cell.adjacentMines >= 3 && !state.autoSolving) playSound('click');
   }
 
   // Screen shake for high danger
@@ -554,6 +559,11 @@ function revealTile(r, c) {
     rexHint = `There are ${cell.adjacentMines} mine(s) nearby. Respond with caution, mention nearby danger.`;
   } else {
     rexHint = `HOT ZONE! ${cell.adjacentMines} adjacent mines! Respond with high tension and hot zone warning.`;
+  }
+
+  // If AI is auto-solving rapidly, don't spam the free-tier API
+  if (state.autoSolving) {
+    return;
   }
 
   showRexLoading(true);
@@ -738,7 +748,7 @@ async function handleExplosion(r, c) {
   state.gameOver = true;
   stopTimer();
 
-  playExplosionBoom();
+  playSound('explosion');
 
   // Reveal all mines
   state.board[r][c].revealed = true;
@@ -803,7 +813,7 @@ async function handleVictory() {
   state.gameOver = true;
   stopTimer();
 
-  playVictoryMorse();
+  playSound('victory');
 
   const prompt = JSON.stringify({
     action: 'victory',
