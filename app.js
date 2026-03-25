@@ -3,11 +3,11 @@
    ═══════════════════════════════════════════════════════════ */
 
 // ─── CONFIGURATION ─────────────────────────────────────────
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
 // API key stored securely in localStorage
 function getApiKey() {
-  return "AIzaSyD2Q0jT_N9Y39MxmeY7-e62eVgLSgNMKoM"; // Hardcoded for testing
+  return "AIzaSyBesuY_vICeeiCn7-NHnLegS5m8odvp7lU"; // Hardcoded for testing
 }
 function setApiKey(key) {
   localStorage.setItem('defuse_gemini_key', key);
@@ -1221,7 +1221,7 @@ async function attemptDeterministicMove() {
       if (unrevealed.length > 0 && unrevealed.length === cell.adjacentMines - flaggedCount) {
         const target = unrevealed[0];
         addRexMessage(`Target ${tileCoordToLabel(r, c)} needs ${cell.adjacentMines} mines. We see ${unrevealed.length} hidden spots left. Flagging ${tileCoordToLabel(target.r, target.c)}.`, "Tactics");
-        toggleFlag(target.r, target.c); // Flag it
+        flagTile(target.r, target.c); // Flag it
         return true; // Move made
       }
     }
@@ -1245,6 +1245,62 @@ async function attemptDeterministicMove() {
         addRexMessage(`Target ${tileCoordToLabel(r, c)} has all its mines flagged. ${tileCoordToLabel(target.r, target.c)} is safe to clear.`, "Tactics");
         revealTile(target.r, target.c); // Reveal it
         return true; // Move made
+      }
+    }
+  }
+
+  // 3. Advanced Subset Logic (1-2 patterns)
+  const frontier = [];
+  for (let r = 0; r < state.rows; r++) {
+    for (let c = 0; c < state.cols; c++) {
+      const cell = state.board[r][c];
+      if (!cell.revealed || cell.adjacentMines === 0) continue;
+      const neighbors = getAdjacentCells(r, c);
+      const unrevealed = neighbors.filter(n => !n.cell.revealed && !n.cell.flagged);
+      const flaggedCount = neighbors.filter(n => n.cell.flagged).length;
+      const missingMines = cell.adjacentMines - flaggedCount;
+      if (unrevealed.length > 0 && missingMines > 0) {
+        frontier.push({ r, c, unrevealed, missingMines });
+      }
+    }
+  }
+
+  // Compare every pair in frontier
+  for (let i = 0; i < frontier.length; i++) {
+    for (let j = 0; j < frontier.length; j++) {
+      if (i === j) continue;
+      const A = frontier[i];
+      const B = frontier[j];
+
+      // Check distance to optimize (must be <= 2 apart)
+      if (Math.abs(A.r - B.r) > 2 || Math.abs(A.c - B.c) > 2) continue;
+
+      // Check if U(A) is a strict subset of U(B)
+      let isSubset = true;
+      for (const nA of A.unrevealed) {
+        if (!B.unrevealed.find(nB => nB.r === nA.r && nB.c === nA.c)) {
+          isSubset = false; break;
+        }
+      }
+
+      if (isSubset && A.unrevealed.length < B.unrevealed.length) {
+        // Find difference U(B) - U(A)
+        const diff = B.unrevealed.filter(nB => !A.unrevealed.find(nA => nA.r === nB.r && nA.c === nB.c));
+        const minesDiff = B.missingMines - A.missingMines;
+
+        if (minesDiff === 0) {
+          // All diff are safe!
+          const target = diff[0];
+          addRexMessage(`Pattern match between ${tileCoordToLabel(A.r, A.c)} and ${tileCoordToLabel(B.r, B.c)}. ${tileCoordToLabel(target.r, target.c)} is safe to clear.`, "Tactics");
+          revealTile(target.r, target.c);
+          return true;
+        } else if (minesDiff === diff.length) {
+          // All diff are mines!
+          const target = diff[0];
+          addRexMessage(`Pattern constraint confirms ${tileCoordToLabel(target.r, target.c)} is a mine. Flagging.`, "Tactics");
+          flagTile(target.r, target.c);
+          return true;
+        }
       }
     }
   }
