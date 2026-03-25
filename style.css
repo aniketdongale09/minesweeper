@@ -763,7 +763,7 @@ body {
 .gameover-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.4);
     z-index: 80;
     display: flex;
     align-items: center;
@@ -942,8 +942,15 @@ body {
    VICTORY SCREEN
    ═══════════════════════════════════════════════════ */
 
-#victory-screen {
-    background: var(--bg);
+.victory-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.5s ease-out;
 }
 
 .victory-pulse {
@@ -976,11 +983,16 @@ body {
     z-index: 50;
 }
 
-.victory-content {
-    z-index: 60;
+.victory-panel {
+    background: rgba(10, 10, 10, 0.95);
+    border: 2px solid var(--gold);
+    box-shadow: 0 0 40px rgba(255, 215, 0, 0.3), inset 0 0 30px rgba(0, 0, 0, 0.5);
+    padding: 2rem 3rem;
     text-align: center;
-    padding: 2rem;
-    max-width: 600px;
+    max-width: 550px;
+    width: 90%;
+    animation: stamp-in 0.4s ease-out;
+    z-index: 90;
 }
 
 .stamp-cleared {

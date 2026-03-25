@@ -129,35 +129,17 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- ═══════════════ EXPLOSION SCREEN ═══════════════ -->
-    <div id="explosion-screen" class="screen">
-        <div class="scanline-overlay"></div>
-        <div class="explosion-flash" id="explosion-flash"></div>
-        <div class="explosion-content">
-            <div class="soldier-silhouette"></div>
-            <h1 class="stamp-failed">MISSION FAILED</h1>
-            <div id="explosion-eulogy" class="eulogy-text"></div>
-            <div class="explosion-stats" id="explosion-stats"></div>
-            <div class="explosion-buttons">
-                <button id="btn-try-again" class="btn-military">↻ TRY AGAIN</button>
-                <button id="btn-return-base" class="btn-military btn-secondary">◄ RETURN TO BASE</button>
+        <!-- VICTORY OVERLAY (stays on game screen so board is visible) -->
+        <div id="victory-overlay" class="victory-overlay" style="display:none;">
+            <div class="victory-pulse" id="victory-pulse"></div>
+            <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+            <div class="victory-panel">
+                <h1 class="stamp-cleared">FIELD CLEARED</h1>
+                <div id="victory-speech" class="victory-speech"></div>
+                <div id="victory-title" class="legendary-title"></div>
+                <div class="victory-stats" id="victory-stats"></div>
+                <button id="btn-next-mission" class="btn-military btn-gold">▶ NEXT MISSION</button>
             </div>
-        </div>
-    </div>
-
-    <!-- ═══════════════ VICTORY SCREEN ═══════════════ -->
-    <div id="victory-screen" class="screen">
-        <div class="scanline-overlay"></div>
-        <div class="victory-pulse" id="victory-pulse"></div>
-        <canvas id="confetti-canvas"></canvas>
-        <div class="victory-content">
-            <h1 class="stamp-cleared">FIELD CLEARED</h1>
-            <div id="victory-speech" class="victory-speech"></div>
-            <div id="victory-title" class="legendary-title"></div>
-            <div class="victory-stats" id="victory-stats"></div>
-            <button id="btn-next-mission" class="btn-military btn-gold">▶ NEXT MISSION</button>
         </div>
     </div>
 

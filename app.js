@@ -82,8 +82,7 @@ const dom = {
   explosionFlash: $('#explosion-flash'),
   explosionEulogy: $('#explosion-eulogy'),
   explosionStats: $('#explosion-stats'),
-  btnTryAgain: $('#btn-try-again'),
-  btnReturnBase: $('#btn-return-base'),
+  victoryOverlay: $('#victory-overlay'),
   victorySpeech: $('#victory-speech'),
   victoryTitle: $('#victory-title'),
   victoryStats: $('#victory-stats'),
@@ -833,9 +832,9 @@ async function handleVictory() {
     `Soldier has cleared the entire minefield! Give an emotional 4 sentence celebration. Award the soldier a legendary field title (something creative and epic, like "The Ghost Walker" or "Iron Nerve"). End your message with "Field Title Awarded: [TITLE]" on its own line. Context: ${prompt}`,
   );
 
-  await delay(1000);
-  showScreen('victory');
+  await delay(800);
   startConfetti();
+  dom.victoryOverlay.style.display = 'flex';
 
   // Stats
   dom.victoryStats.innerHTML = `
@@ -1046,8 +1045,14 @@ function resetGame() {
   dom.grid.innerHTML = '';
   renderGrid();
 
-  // Hide game-over overlay if visible
+  // Hide overlays if visible
   dom.gameoverOverlay.style.display = 'none';
+  dom.victoryOverlay.style.display = 'none';
+  if (window.confettiInterval) {
+    clearInterval(window.confettiInterval);
+    const ctx = dom.confettiCanvas.getContext('2d');
+    ctx.clearRect(0, 0, dom.confettiCanvas.width, dom.confettiCanvas.height);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1090,20 +1095,6 @@ function setupEvents() {
     addRexMessage("Channel open. I'm here with you, soldier. Take your first step.", "Game started");
   });
 
-  // Try again
-  dom.btnTryAgain.addEventListener('click', () => {
-    showScreen('game');
-    state.rexHistory = [];
-    resetGame();
-    addRexMessage("Back on your feet, soldier. This minefield won't clear itself.", "Retry");
-  });
-
-  // Return to base
-  dom.btnReturnBase.addEventListener('click', () => {
-    state.rexHistory = [];
-    showMissionBriefing();
-  });
-
   // Overlay retry button (same as Try Again)
   dom.btnOverlayRetry.addEventListener('click', () => {
     showScreen('game');
@@ -1120,7 +1111,6 @@ function setupEvents() {
 
   // Next mission
   dom.btnNextMission.addEventListener('click', () => {
-    showScreen('game');
     state.rexHistory = [];
     resetGame();
     addRexMessage("New field, same rules. Show me what you've learned, soldier.", "Next mission");
