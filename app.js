@@ -7,7 +7,7 @@ const GEMINI_MODEL = 'gemini-2.5-flash';
 
 // API key stored securely in localStorage
 function getApiKey() {
-  return "AIzaSyBesuY_vICeeiCn7-NHnLegS5m8odvp7lU"; // Hardcoded for testing
+  return ""// "AIzaSyBesuY_vICeeiCn7-NHnLegS5m8odvp7lU"; // Hardcoded for testing
 }
 function setApiKey(key) {
   localStorage.setItem('defuse_gemini_key', key);
@@ -755,6 +755,12 @@ async function handleExplosion(r, c, isSurrender = false) {
   state.gameOver = true;
   stopTimer();
 
+  // If player surrenders without making a single click, generate the board so there is a solution to reveal
+  if (state.firstClick && isSurrender) {
+    initBoard(Math.floor(state.rows / 2), Math.floor(state.cols / 2));
+    state.firstClick = false;
+  }
+
   playSound('explosion');
 
   // Reveal ALL tiles so the player can see the full board
@@ -1218,7 +1224,7 @@ async function attemptDeterministicMove() {
     // Click middle
     const r = Math.floor(state.rows / 2);
     const c = Math.floor(state.cols / 2);
-    addRexMessage(`Initiating breach at ${tileCoordToLabel(r, c)}.`, "Auto-Solve");
+    addRexMessage(`Step 1 (First Move): The board is clear. Initiating central breach at ${tileCoordToLabel(r, c)} to maximize initial intel gathering.`, "Auto-Solve");
     revealTile(r, c);
     return true;
   }
@@ -1236,7 +1242,7 @@ async function attemptDeterministicMove() {
       // Rule: If remaining unrevealed == remaining mines needed, they are all mines
       if (unrevealed.length > 0 && unrevealed.length === cell.adjacentMines - flaggedCount) {
         const target = unrevealed[0];
-        addRexMessage(`Target ${tileCoordToLabel(r, c)} needs ${cell.adjacentMines} mines. We see ${unrevealed.length} hidden spots left. Flagging ${tileCoordToLabel(target.r, target.c)}.`, "Tactics");
+        addRexMessage(`Rule 1 (Basic Flag): Tile ${tileCoordToLabel(r, c)} needs ${cell.adjacentMines} mines. It is touching exactly ${unrevealed.length} unrevealed spot(s). Therefore, ${tileCoordToLabel(target.r, target.c)} MUST be a mine. Flagging.`, "Tactics");
         flagTile(target.r, target.c); // Flag it
         return true; // Move made
       }
@@ -1256,9 +1262,7 @@ async function attemptDeterministicMove() {
       // Rule: If flagged == adjacent mines, all other unrevealed are safe
       if (unrevealed.length > 0 && flaggedCount === cell.adjacentMines) {
         const target = unrevealed[0];
-        // We only narrate occasionally to avoid spam, or constantly for small bits?
-        // Let's narrate this action
-        addRexMessage(`Target ${tileCoordToLabel(r, c)} has all its mines flagged. ${tileCoordToLabel(target.r, target.c)} is safe to clear.`, "Tactics");
+        addRexMessage(`Rule 2 (Free Clear): Tile ${tileCoordToLabel(r, c)} needs ${cell.adjacentMines} mines, and we have already flagged ${flaggedCount} around it. The remaining unknown spots are safe. Clearing ${tileCoordToLabel(target.r, target.c)}.`, "Tactics");
         revealTile(target.r, target.c); // Reveal it
         return true; // Move made
       }
@@ -1307,13 +1311,13 @@ async function attemptDeterministicMove() {
         if (minesDiff === 0) {
           // All diff are safe!
           const target = diff[0];
-          addRexMessage(`Pattern match between ${tileCoordToLabel(A.r, A.c)} and ${tileCoordToLabel(B.r, B.c)}. ${tileCoordToLabel(target.r, target.c)} is safe to clear.`, "Tactics");
+          addRexMessage(`Rule 3 (Advanced Subset): ${tileCoordToLabel(A.r, A.c)}'s unknown spots are fully inside ${tileCoordToLabel(B.r, B.c)}'s spots. They both need ${B.missingMines} mines. Thus, the extra non-overlapping spot ${tileCoordToLabel(target.r, target.c)} MUST be safe. Clearing.`, "Tactics");
           revealTile(target.r, target.c);
           return true;
         } else if (minesDiff === diff.length) {
           // All diff are mines!
           const target = diff[0];
-          addRexMessage(`Pattern constraint confirms ${tileCoordToLabel(target.r, target.c)} is a mine. Flagging.`, "Tactics");
+          addRexMessage(`Rule 3 (Advanced Subset): ${tileCoordToLabel(A.r, A.c)}'s spots are fully inside ${tileCoordToLabel(B.r, B.c)}. ${tileCoordToLabel(B.r, B.c)} needs ${minesDiff} MORE mine(s) than ${tileCoordToLabel(A.r, A.c)}, and there are exactly ${diff.length} extra spot(s). ${tileCoordToLabel(target.r, target.c)} MUST be a mine. Flagging.`, "Tactics");
           flagTile(target.r, target.c);
           return true;
         }
@@ -1339,9 +1343,7 @@ function makeRandomGuess() {
   // Pick random (we could do advanced probability, but simple random is fine for a guess fallback)
   const pick = available[Math.floor(Math.random() * available.length)];
 
-  if (state.personality === 'drill-sergeant') addRexMessage(`No clear intel. Going blind on ${tileCoordToLabel(pick.r, pick.c)}. Brace yourself!`, "Guessing");
-  else if (state.personality === 'mentor') addRexMessage(`Stuck. Analyzing probabilities... trying ${tileCoordToLabel(pick.r, pick.c)}.`, "Guessing");
-  else addRexMessage(`I have no idea. Closing my eyes and clicking ${tileCoordToLabel(pick.r, pick.c)}.`, "Guessing");
+  addRexMessage(`Rule 4 (Probability Guess): No 100% logic available. All patterns exhausted. Taking a calculated blind guess on ${tileCoordToLabel(pick.r, pick.c)}. Brace yourself!`, "Guessing");
 
   revealTile(pick.r, pick.c);
 }
