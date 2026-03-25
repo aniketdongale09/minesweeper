@@ -55,6 +55,9 @@ let state = {
   rexHistory: [],
   moveHistory: [],
   geminiQueue: Promise.resolve(),
+  heatmapEnabled: false,
+  heatmapData: null,
+  clickPatterns: { corners: 0, edges: 0, center: 0, totalClicks: 0, timings: [], lastClickTime: null },
 };
 
 // ─── DOM REFERENCES ────────────────────────────────────────
@@ -95,6 +98,7 @@ const dom = {
   rexPersonality: $('#rex-personality'),
   btnVoice: $('#btn-voice'),
   btnAutoSolve: $('#btn-auto-solve'),
+  btnHeatmap: $('#btn-heatmap'),
   btnSurrender: $('#btn-surrender'),
   gameoverOverlay: $('#gameover-overlay'),
   gameoverTitle: $('#gameover-title'),
@@ -478,6 +482,133 @@ function labelToCoord(label) {
   return { row, col };
 }
 
+// ─── FEATURE HELPERS ────────────────────────────────────────
+
+/**
+ * findMissedFlags — scans all revealed number tiles and identifies
+ * unrevealed mine neighbors that were logically deducible (definite mines).
+ * Returns a Set of "r,c" strings.
+ */
+function findMissedFlags() {
+  const missed = new Set();
+  for (let r = 0; r < state.rows; r++) {
+    for (let c = 0; c < state.cols; c++) {
+      const cell = state.board[r][c];
+      if (!cell.revealed || cell.mine || cell.adjacentMines === 0) continue;
+
+      let hiddenCount = 0;
+      let flagCount = 0;
+      const hiddenMines = [];
+      forEachNeighbor(r, c, (nr, nc) => {
+        const n = state.board[nr][nc];
+        if (n.flagged) flagCount++;
+        else if (!n.revealed) {
+          hiddenCount++;
+          if (n.mine) hiddenMines.push(`${nr},${nc}`);
+        }
+      });
+
+      // If remaining mine count == remaining hidden count, ALL hidden neighbors are mines
+      const remaining = cell.adjacentMines - flagCount;
+      const totalHidden = hiddenCount;
+      if (remaining > 0 && remaining === totalHidden) {
+        hiddenMines.forEach(key => missed.add(key));
+      }
+    }
+  }
+  return missed;
+}
+
+/**
+ * classifyClick — returns 'corners', 'edges', or 'center' for a tile position.
+ */
+function classifyClick(r, c) {
+  const isTopBottom = r === 0 || r === state.rows - 1;
+  const isLeftRight = c === 0 || c === state.cols - 1;
+  if (isTopBottom && isLeftRight) return 'corners';
+  if (isTopBottom || isLeftRight) return 'edges';
+  return 'center';
+}
+
+/**
+ * getPlayerStyleSummary — converts click pattern data into a short string for Rex.
+ */
+function getPlayerStyleSummary() {
+  const p = state.clickPatterns;
+  if (p.totalClicks < 3) return null;
+  const dominant = ['corners', 'edges', 'center'].reduce((a, b) => p[a] > p[b] ? a : b);
+  const avgTime = p.timings.length > 0
+    ? (p.timings.reduce((a, b) => a + b, 0) / p.timings.length).toFixed(1)
+    : null;
+  const pace = avgTime ? (parseFloat(avgTime) < 2 ? 'plays very fast' : parseFloat(avgTime) > 6 ? 'plays slowly and carefully' : 'plays at a steady pace') : '';
+  return `The soldier prefers clicking ${dominant} (${p[dominant]}/${p.totalClicks} clicks)${pace ? ', and ' + pace : ''} (avg ${avgTime}s between moves).`;
+}
+
+/**
+ * computeProbabilityMap — returns a rows×cols array of 0-1 mine probabilities
+ * based on constraint logic from revealed tiles. null = no constraint info.
+ */
+function computeProbabilityMap() {
+  const { rows, cols } = state;
+  const prob = Array.from({ length: rows }, () => Array(cols).fill(null));
+
+  // Count total unrevealed unflagged tiles for fallback
+  let totalUnknown = 0;
+  let flaggedCount = 0;
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      if (state.board[r][c].flagged) flaggedCount++;
+      else if (!state.board[r][c].revealed) totalUnknown++;
+    }
+  const globalProb = totalUnknown > 0
+    ? Math.max(0, Math.min(1, (state.totalMines - flaggedCount) / totalUnknown))
+    : 0;
+
+  // First pass: set all unknowns to global probability
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++)
+      if (!state.board[r][c].revealed && !state.board[r][c].flagged)
+        prob[r][c] = globalProb;
+
+  // Constraint pass: for each revealed number tile
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = state.board[r][c];
+      if (!cell.revealed || cell.mine || cell.adjacentMines === 0) continue;
+
+      let flagCount = 0;
+      const hidden = [];
+      forEachNeighbor(r, c, (nr, nc) => {
+        const n = state.board[nr][nc];
+        if (n.flagged) flagCount++;
+        else if (!n.revealed) hidden.push([nr, nc]);
+      });
+
+      const remaining = cell.adjacentMines - flagCount;
+      if (hidden.length === 0) continue;
+
+      const localProb = Math.max(0, Math.min(1, remaining / hidden.length));
+
+      // If definite mine or definite safe, override strongly
+      hidden.forEach(([hr, hc]) => {
+        if (remaining === hidden.length) {
+          prob[hr][hc] = 1.0; // definite mine
+        } else if (remaining === 0) {
+          prob[hr][hc] = 0.0; // definite safe
+        } else {
+          // blend: take max probability from any constraint (conservative)
+          if (prob[hr][hc] === null || localProb > prob[hr][hc]) {
+            prob[hr][hc] = localProb;
+          }
+        }
+      });
+    }
+  }
+  return prob;
+}
+
+
+
 function revealTile(r, c) {
   const tile = state.board[r][c];
   if (tile.revealed || tile.flagged || state.gameOver) return;
@@ -488,6 +619,16 @@ function revealTile(r, c) {
     state.firstClick = false;
     startTimer();
   }
+
+  // Track click pattern (corner / edge / center)
+  const now = Date.now();
+  if (state.clickPatterns.lastClickTime) {
+    state.clickPatterns.timings.push((now - state.clickPatterns.lastClickTime) / 1000);
+  }
+  state.clickPatterns.lastClickTime = now;
+  const zone = classifyClick(r, c);
+  state.clickPatterns[zone]++;
+  state.clickPatterns.totalClicks++;
 
   const cell = state.board[r][c];
 
@@ -738,6 +879,19 @@ function renderGrid() {
       } else {
         tileEl.classList.add('tile-hidden');
       }
+      // Apply heatmap coloring to unrevealed tiles
+      if (!cell.revealed && !cell.flagged && state.heatmapEnabled && state.heatmapData) {
+        const prob = state.heatmapData[r][c];
+        if (prob !== null) {
+          tileEl.classList.add('heat-active');
+          tileEl.style.setProperty('--heat', prob.toFixed(3));
+        }
+      }
+
+      // Apply missed-flag indicator
+      if (state.gameOver && !cell.revealed && !cell.flagged && cell.mine && state.missedFlags && state.missedFlags.has(`${r},${c}`)) {
+        tileEl.classList.add('missed-flag');
+      }
     }
   }
 }
@@ -774,11 +928,20 @@ async function handleExplosion(r, c, isSurrender = false) {
   const tileLabel = tileCoordToLabel(r, c);
   showRexLoading(true);
   const moveLog = state.moveHistory.join(" -> ");
+  // Compute missed flags for post-game replay + style for Rex
+  state.missedFlags = !isSurrender ? findMissedFlags() : new Set();
+  const styleSummary = getPlayerStyleSummary();
+  const missedList = state.missedFlags.size > 0
+    ? [...state.missedFlags].map(k => { const [mr, mc] = k.split(',').map(Number); return tileCoordToLabel(mr, mc); }).join(', ')
+    : null;
+
   const gameOverPrompt = isSurrender
-    ? `The rookie surrendered and gave up. Give a ${state.personality === 'comedian' ? 'sarcastically funny' : state.personality === 'mentor' ? 'understanding but disappointed' : 'harsh and disgusted'} 2-sentence tactical commentary. End with "MISSION ABORTED".`
+    ? `The rookie surrendered and gave up. Give a ${state.personality === 'comedian' ? 'sarcastically funny' : state.personality === 'mentor' ? 'understanding but disappointed' : 'harsh and disgusted'} 2-sentence tactical commentary.${styleSummary ? ' Player style context: ' + styleSummary : ''} End with "MISSION ABORTED".`
     : `The rookie just triggered a mine and died. The mission failed.
 Here are their last few moves: ${moveLog}.
-Based on Minesweeper logic, brutally point out their fatal mistake or logical error (e.g. "You should have known X was a mine because...").
+${missedList ? `IMPORTANT: The soldier could have logically deduced that tile(s) [${missedList}] were mines BEFORE clicking. Mention this specifically.` : ''}
+${styleSummary ? `Player style context: ${styleSummary}` : ''}
+Based on Minesweeper logic, brutally point out their fatal mistake or logical error.
 Give a dramatic, ${state.personality === 'comedian' ? 'sarcastically funny' : 'harsh'} tactical analysis.
 End with "MISSION FAILED". Max 4 sentences.`;
 
@@ -797,6 +960,7 @@ End with "MISSION FAILED". Max 4 sentences.`;
   dom.gameoverOverlay.style.display = 'flex';
   dom.btnSurrender.innerHTML = '↻ NEW GAME';
   dom.btnSurrender.classList.add('btn-gold');
+  dom.btnSurrender.dataset.mode = 'newgame';
 
   // Eulogy
   const eulogy = await eulogyPromise;
@@ -805,6 +969,11 @@ End with "MISSION FAILED". Max 4 sentences.`;
     ? "Retreating from the field. Some battles aren't meant to be won today."
     : "That rookie had guts. More guts than brains, but guts nonetheless. The field claims another.");
   await typewriter(dom.gameoverEulogy, eulogyText, 30);
+
+  // Render missed-flag indicators on the board after overlay appears
+  if (state.missedFlags && state.missedFlags.size > 0) {
+    renderGrid();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -827,7 +996,7 @@ async function handleVictory() {
 
   showRexLoading(true);
   const speechPromise = queueGeminiCall(
-    `Soldier has cleared the entire minefield! Give an emotional 4 sentence celebration. Award the soldier a legendary field title (something creative and epic, like "The Ghost Walker" or "Iron Nerve"). End your message with "Field Title Awarded: [TITLE]" on its own line. Context: ${prompt}`,
+    `Soldier has cleared the entire minefield! Give an emotional 4 sentence celebration. Award the soldier a legendary field title (something creative and epic, like "The Ghost Walker" or "Iron Nerve").${getPlayerStyleSummary() ? ' Weave in this observation about their style: ' + getPlayerStyleSummary() : ''} End your message with "Field Title Awarded: [TITLE]" on its own line. Context: ${prompt}`,
   );
 
   await delay(800);
@@ -842,6 +1011,7 @@ async function handleVictory() {
   `;
   dom.btnSurrender.innerHTML = '↻ NEW GAME';
   dom.btnSurrender.classList.add('btn-gold');
+  dom.btnSurrender.dataset.mode = 'newgame';
 
   const speech = await speechPromise;
   showRexLoading(false);
@@ -1035,6 +1205,13 @@ function resetGame() {
   dom.rexMessages.innerHTML = '';
   dom.btnSurrender.innerHTML = '☠ SURRENDER';
   dom.btnSurrender.classList.remove('btn-gold');
+  dom.btnSurrender.dataset.mode = 'surrender';
+  // Reset new feature state
+  state.heatmapData = null;
+  state.heatmapEnabled = false;
+  state.missedFlags = null;
+  state.clickPatterns = { corners: 0, edges: 0, center: 0, totalClicks: 0, timings: [], lastClickTime: null };
+  if (dom.btnHeatmap) { dom.btnHeatmap.classList.remove('active'); }
   dom.btnLifeline.disabled = false;
   dom.btnLifeline.textContent = '⚠ EMERGENCY RADIO (1x USE)';
   dom.btnLifeline.innerHTML = '<span class="lifeline-icon">⚠</span> EMERGENCY RADIO (1x USE)';
@@ -1097,16 +1274,16 @@ function setupEvents() {
     addRexMessage("Channel open. I'm here with you, soldier. Take your first step.", "Game started");
   });
 
-  // Surrender / New Game
+  // Surrender / New Game — read current mode from button's data attribute
   dom.btnSurrender.addEventListener('click', () => {
-    if (state.gameOver) {
+    if (dom.btnSurrender.dataset.mode === 'newgame') {
       state.rexHistory = [];
       resetGame();
       addRexMessage("Back on your feet, soldier. This minefield won't clear itself.", "Retry");
       return;
     }
-    // Only allow surrender if a game is in progress (board exists)
-    if (state.firstClick && !state.board?.length) return;
+    // Only allow surrender if board is initialized
+    if (!state.board?.length) return;
     handleExplosion(0, 0, true);
   });
 
@@ -1142,7 +1319,21 @@ function setupEvents() {
     addRexMessage("New field, same rules. Show me what you've learned, soldier.", "Next mission");
   });
 
-  // AI Controls
+  // Heatmap toggle
+  dom.btnHeatmap.addEventListener('click', () => {
+    if (state.gameOver || !state.board?.length) return;
+    state.heatmapEnabled = !state.heatmapEnabled;
+    if (state.heatmapEnabled) {
+      state.heatmapData = computeProbabilityMap();
+      dom.btnHeatmap.classList.add('active');
+    } else {
+      state.heatmapData = null;
+      dom.btnHeatmap.classList.remove('active');
+    }
+    renderGrid();
+  });
+
+  // AI Auto-Solve
   dom.btnAutoSolve.addEventListener('click', async () => {
     if (state.gameOver || !state.firstClick && !state.gameStarted) return;
     if (state.autoSolving) return; // Already solving
@@ -1165,18 +1356,7 @@ function setupEvents() {
     }
   });
 
-  dom.btnSurrender.addEventListener('click', () => {
-    if (state.gameOver || !state.firstClick && !state.gameStarted) return;
-
-    state.autoSolving = false; // Stop auto-solve if active
-    addRexMessage((state.personality === 'drill-sergeant') ? "Coward. Pathetic display." :
-      (state.personality === 'mentor') ? "Tactical retreat is sometimes necessary. Standing down." :
-        "Finally gave up, huh? Good idea, let's go get coffee.", "Mission Aborted");
-
-    // Trigger game loss (using 0,0 with isSurrender flag set to true)
-    handleExplosion(0, 0, true);
-  });
-
+  // Personality
   dom.rexPersonality.addEventListener('change', (e) => {
     state.personality = e.target.value;
     const greetings = {

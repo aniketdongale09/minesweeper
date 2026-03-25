@@ -1135,6 +1135,70 @@ body {
     width: auto !important;
 }
 
+/* ─── HEATMAP BUTTON ────────────────────────────── */
+.btn-heatmap {
+    color: #f0a500;
+    border-color: #f0a500;
+    font-family: var(--font-heading);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    padding: 0 0.5rem;
+    width: auto;
+    transition: all 0.2s;
+}
+
+.btn-heatmap:hover {
+    color: var(--bg);
+    background: #f0a500;
+    box-shadow: 0 0 10px rgba(240, 165, 0, 0.5);
+}
+
+.btn-heatmap.active {
+    background: rgba(240, 165, 0, 0.2);
+    color: #f0a500;
+    box-shadow: 0 0 12px rgba(240, 165, 0, 0.4);
+}
+
+/* ─── HEATMAP TILE ──────────────────────────────── */
+.tile.heat-active {
+    background: hsl(calc(120 - var(--heat, 0.5) * 120), 75%, 12%);
+    border-color: hsl(calc(120 - var(--heat, 0.5) * 120), 70%, 25%);
+    box-shadow: inset 0 0 6px hsl(calc(120 - var(--heat, 0.5) * 120), 80%, 20%);
+}
+
+/* ─── MISSED FLAG INDICATOR ─────────────────────── */
+.tile.missed-flag {
+    background: rgba(255, 0, 0, 0.15) !important;
+    border-color: var(--red) !important;
+    animation: missed-pulse 1s ease-in-out infinite;
+    position: relative;
+}
+
+.tile.missed-flag::after {
+    content: '!';
+    position: absolute;
+    top: 1px;
+    right: 3px;
+    font-size: 0.55rem;
+    font-weight: bold;
+    color: var(--red);
+    text-shadow: 0 0 4px var(--red-glow);
+    font-family: var(--font-heading);
+}
+
+@keyframes missed-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 4px var(--red-glow);
+    }
+
+    50% {
+        box-shadow: 0 0 12px var(--red-glow), inset 0 0 8px rgba(255, 0, 0, 0.2);
+    }
+}
+
 /* ─── SETTINGS BUTTON ───────────────────────────── */
 .btn-settings {
     font-size: 1.2rem;
@@ -1377,9 +1441,13 @@ body {
     }
 
     .top-bar-center {
-        order: -1;
-        width: 100%;
-        text-align: center;
+        display: none;
+        /* Hide the DEFUSE title to save space */
+    }
+
+    .top-bar-left,
+    .top-bar-right {
+        gap: 0.5rem;
     }
 
     .game-title-small {
@@ -1399,6 +1467,12 @@ body {
     .diff-btn {
         padding: 0.25rem 0.5rem;
         font-size: 0.55rem;
+    }
+
+    .btn-solve,
+    .btn-surrender {
+        font-size: 0.6rem;
+        padding: 0.3rem 0.6rem;
     }
 }
 
