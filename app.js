@@ -7,7 +7,7 @@ const GEMINI_MODEL = 'gemini-2.5-flash';
 
 // API key stored securely in localStorage
 function getApiKey() {
-  return ""// "AIzaSyBesuY_vICeeiCn7-NHnLegS5m8odvp7lU"; // Hardcoded for testing
+  return ""// "Your_GEMENI_KEY"; // Hardcoded for testing
 }
 function setApiKey(key) {
   localStorage.setItem('defuse_gemini_key', key);
